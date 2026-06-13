@@ -1,65 +1,546 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import * as XLSX from 'xlsx';
+
+type ContractStatus =
+  | 'Підготовка Комерційної пропозиції'
+  | 'В процесі погодження'
+  | 'Підготовка договору'
+  | 'Договір на підписі'
+  | 'Підписаний договір'
+  | 'В процесі поставки товару'
+  | 'Очікує оплати'
+  | 'Сплачено'
+  | 'Анульований договір';
+
+type Contract = {
+  id: string;
+  contractNumber: string;
+  title: string;
+  customer: string;
+  amount: number;
+  status: ContractStatus;
+  contractDate: string;
+  deliveryDeadline: string;
+  notes: string;
+};
+
+const STATUSES: ContractStatus[] = [
+  'Підготовка Комерційної пропозиції',
+  'В процесі погодження',
+  'Підготовка договору',
+  'Договір на підписі',
+  'Підписаний договір',
+  'В процесі поставки товару',
+  'Очікує оплати',
+  'Сплачено',
+  'Анульований договір',
+];
+
+const emptyForm: Omit<Contract, 'id'> = {
+  contractNumber: '',
+  title: '',
+  customer: '',
+  amount: 0,
+  status: 'Підготовка Комерційної пропозиції',
+  contractDate: '',
+  deliveryDeadline: '',
+  notes: '',
+};
+
+function formatMoney(value: number) {
+  const formatted = new Intl.NumberFormat('uk-UA', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+
+  return `${formatted} грн`;
+}
+function makeNextContractNumber(contracts: Contract[]) {
+  const year = new Date().getFullYear();
+
+  const numbers = contracts
+    .map((item) => item.contractNumber)
+    .map((number) => {
+      const match = number.match(/^Д-(\d+)\/\d{4}$/);
+      return match ? Number(match[1]) : 0;
+    });
+
+  const maxNumber = numbers.length ? Math.max(...numbers) : 0;
+  const nextNumber = String(maxNumber + 1).padStart(3, '0');
+
+  return `Д-${nextNumber}/${year}`;
+}
 
 export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+  const [contracts, setContracts] = useState<Contract[]>([]);
+const [form, setForm] = useState<Omit<Contract, 'id'>>(emptyForm);
+const [editingId, setEditingId] = useState<string | null>(null);
+const [search, setSearch] = useState('');
+const [statusFilter, setStatusFilter] = useState<'Всі статуси' | ContractStatus>('Всі статуси');
+const [isLoaded, setIsLoaded] = useState(false);
+
+useEffect(() => {
+  const saved = localStorage.getItem('contracts-crm');
+
+  if (saved) {
+    try {
+      setContracts(JSON.parse(saved));
+    } catch {
+      setContracts([]);
+    }
+  }
+
+  setIsLoaded(true);
+}, []);
+
+useEffect(() => {
+  if (!isLoaded) return;
+
+  localStorage.setItem('contracts-crm', JSON.stringify(contracts));
+}, [contracts, isLoaded]);
+
+  const filteredContracts = useMemo(() => {
+    return contracts.filter((contract) => {
+      const text = `${contract.contractNumber} ${contract.title} ${contract.customer} ${contract.notes}`.toLowerCase();
+
+      const matchesSearch = text.includes(search.toLowerCase());
+      const matchesStatus =
+        statusFilter === 'Всі статуси' || contract.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [contracts, search, statusFilter]);
+
+  const totalAmount = useMemo(() => {
+    return filteredContracts.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  }, [filteredContracts]);
+
+  const paidAmount = useMemo(() => {
+    return contracts
+      .filter((item) => item.status === 'Сплачено')
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  }, [contracts]);
+
+  const unpaidAmount = useMemo(() => {
+    return contracts
+      .filter((item) => item.status !== 'Сплачено' && item.status !== 'Анульований договір')
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  }, [contracts]);
+
+  function handleChange(
+    field: keyof Omit<Contract, 'id'>,
+    value: string | number
+  ) {
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }
+
+  function handleSubmit() {
+    if (!form.title.trim()) {
+      alert('Вкажіть назву договору або предмет закупівлі');
+      return;
+    }
+
+    if (!form.amount || Number(form.amount) <= 0) {
+      alert('Вкажіть суму договору');
+      return;
+    }
+
+    if (editingId) {
+      setContracts((prev) =>
+        prev.map((item) =>
+          item.id === editingId
+            ? {
+                ...item,
+                ...form,
+                amount: Number(form.amount),
+              }
+            : item
+        )
+      );
+
+      setEditingId(null);
+      setForm(emptyForm);
+      return;
+    }
+
+    const newContract: Contract = {
+      id: crypto.randomUUID(),
+      ...form,
+      contractNumber: form.contractNumber || makeNextContractNumber(contracts),
+      amount: Number(form.amount),
+    };
+
+    setContracts((prev) => [newContract, ...prev]);
+    setForm(emptyForm);
+  }
+
+  function handleEdit(contract: Contract) {
+    setEditingId(contract.id);
+
+    setForm({
+      contractNumber: contract.contractNumber,
+      title: contract.title,
+      customer: contract.customer,
+      amount: contract.amount,
+      status: contract.status,
+      contractDate: contract.contractDate,
+      deliveryDeadline: contract.deliveryDeadline,
+      notes: contract.notes,
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleDelete(id: string) {
+    const confirmed = confirm('Точно видалити цей договір?');
+
+    if (!confirmed) return;
+
+    setContracts((prev) => prev.filter((item) => item.id !== id));
+  }
+function handleStatusChange(id: string, status: ContractStatus) {
+  setContracts((prev) =>
+    prev.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            status,
+          }
+        : item
+    )
   );
+}
+  function handleCancelEdit() {
+    setEditingId(null);
+    setForm(emptyForm);
+  }
+
+  function exportToCsv() {
+    const headers = [
+      '№ договору',
+      'Предмет закупівлі',
+      'Замовник',
+      'Сума',
+      'Статус',
+      'Дата договору',
+      'Дедлайн поставки',
+      'Примітки',
+    ];
+
+    const rows = contracts.map((item) => [
+      item.contractNumber,
+      item.title,
+      item.customer,
+      item.amount,
+      item.status,
+      item.contractDate,
+      item.deliveryDeadline,
+      item.notes,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => `"${String(cell).replaceAll('"', '""')}"`)
+          .join(';')
+      )
+      .join('\n');
+
+    const blob = new Blob(['\uFEFF' + csv], {
+      type: 'text/csv;charset=utf-8;',
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = 'contracts-crm.csv';
+    link.click();
+
+    URL.revokeObjectURL(url);
+  }
+function exportToExcel() {
+  const rows = contracts.map((item) => ({
+    '№ договору': item.contractNumber,
+    'Предмет закупівлі': item.title,
+    'Замовник': item.customer,
+    'Сума': item.amount,
+    'Статус': item.status,
+    'Дата договору': item.contractDate,
+    'Дедлайн поставки': item.deliveryDeadline,
+    'Примітки': item.notes,
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+
+  worksheet['!cols'] = [
+    { wch: 16 },
+    { wch: 45 },
+    { wch: 28 },
+    { wch: 16 },
+    { wch: 32 },
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 45 },
+  ];
+
+  const workbook = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Договори');
+
+  XLSX.writeFile(workbook, 'contracts-crm.xlsx');
+}
+  return (
+    <main className="page">
+      <section className="header">
+        <div>
+          <h1>CRM облік договорів</h1>
+          <p>Система для контролю договорів, поставок, оплат і статусів.</p>
+        </div>
+
+        <div className="exportButtons">
+  <button className="secondaryButton" onClick={exportToCsv}>
+    Експорт CSV
+  </button>
+
+  <button className="secondaryButton" onClick={exportToExcel}>
+  Експорт Excel
+</button>
+</div>
+      </section>
+
+      <section className="statsGrid">
+        <div className="statCard">
+          <span>Кількість договорів</span>
+          <strong>{contracts.length}</strong>
+        </div>
+
+        <div className="statCard">
+          <span>Сума у фільтрі</span>
+          <strong>{formatMoney(totalAmount)}</strong>
+        </div>
+
+        <div className="statCard">
+          <span>Сплачено</span>
+          <strong>{formatMoney(paidAmount)}</strong>
+        </div>
+
+        <div className="statCard">
+          <span>Очікується</span>
+          <strong>{formatMoney(unpaidAmount)}</strong>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>{editingId ? 'Редагування договору' : 'Новий договір'}</h2>
+
+        <div className="formGrid">
+          <label>
+            № договору
+            <input
+              value={form.contractNumber}
+              placeholder="Автоматично, якщо залишити пустим"
+              onChange={(e) => handleChange('contractNumber', e.target.value)}
+            />
+          </label>
+
+          <label>
+            Предмет закупівлі / назва договору
+            <input
+              value={form.title}
+              onChange={(e) => handleChange('title', e.target.value)}
+            />
+          </label>
+
+          <label>
+            Замовник / контрагент
+            <input
+              value={form.customer}
+              onChange={(e) => handleChange('customer', e.target.value)}
+            />
+          </label>
+
+          <label>
+            Сума договору, грн
+            <input
+              type="number"
+              value={form.amount || ''}
+              placeholder="0.00"
+              onChange={(e) => handleChange('amount', Number(e.target.value))}
+            />
+          </label>
+
+          <label>
+            Статус
+            <select
+              value={form.status}
+              onChange={(e) =>
+                handleChange('status', e.target.value as ContractStatus)
+              }
+            >
+              {STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Дата договору
+            <input
+              type="date"
+              value={form.contractDate}
+              onChange={(e) => handleChange('contractDate', e.target.value)}
+            />
+          </label>
+
+          <label>
+            Дедлайн поставки
+            <input
+              type="date"
+              value={form.deliveryDeadline}
+              onChange={(e) => handleChange('deliveryDeadline', e.target.value)}
+            />
+          </label>
+
+          <label className="wide">
+            Примітки
+            <textarea
+              value={form.notes}
+              onChange={(e) => handleChange('notes', e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="actions">
+          <button className="primaryButton" onClick={handleSubmit}>
+            {editingId ? 'Зберегти зміни' : 'Додати договір'}
+          </button>
+
+          {editingId && (
+            <button className="secondaryButton" onClick={handleCancelEdit}>
+              Скасувати редагування
+            </button>
+          )}
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="tableHeader">
+          <h2>Список договорів</h2>
+
+          <div className="filters">
+            <input
+              value={search}
+              placeholder="Пошук..."
+              onChange={(e) => setSearch(e.target.value)}
+            />
+
+            <select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as 'Всі статуси' | ContractStatus)
+              }
+            >
+              <option value="Всі статуси">Всі статуси</option>
+
+              {STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="tableWrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Предмет закупівлі</th>
+                <th>Замовник</th>
+                <th>Сума</th>
+                <th>Статус</th>
+                <th>Дата</th>
+                <th>Дедлайн</th>
+                <th>Примітки</th>
+                <th>Дії</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filteredContracts.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="empty">
+                    Поки немає договорів
+                  </td>
+                </tr>
+              ) : (
+                filteredContracts.map((contract) => (
+                  <tr key={contract.id}>
+                    <td>{contract.contractNumber}</td>
+                    <td className="titleCell">{contract.title}</td>
+                    <td>{contract.customer || '—'}</td>
+                    <td>{formatMoney(contract.amount)}</td>
+                    <td>
+  <select
+    className={`statusSelect ${getStatusClass(contract.status)}`}
+    value={contract.status}
+    onChange={(e) =>
+      handleStatusChange(contract.id, e.target.value as ContractStatus)
+    }
+  >
+    {STATUSES.map((status) => (
+      <option key={status} value={status}>
+        {status}
+      </option>
+    ))}
+  </select>
+</td>
+                    <td>{contract.contractDate || '—'}</td>
+                    <td>{contract.deliveryDeadline || '—'}</td>
+                    <td>{contract.notes || '—'}</td>
+                    <td>
+                      <div className="rowActions">
+                        <button onClick={() => handleEdit(contract)}>
+                          Редагувати
+                        </button>
+                        <button onClick={() => handleDelete(contract.id)}>
+                          Видалити
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function getStatusClass(status: ContractStatus) {
+  switch (status) {
+    case 'Сплачено':
+      return 'paid';
+    case 'Анульований договір':
+      return 'cancelled';
+    case 'Очікує оплати':
+      return 'waiting';
+    case 'В процесі поставки товару':
+      return 'delivery';
+    case 'Підписаний договір':
+      return 'signed';
+    default:
+      return 'progress';
+  }
 }
