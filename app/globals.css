@@ -222,7 +222,10 @@ th {
   cursor: pointer;
   outline: none;
 }
-
+th:nth-child(5),
+td:nth-child(5) {
+  min-width: 285px;
+}
 .statusSelect.progress {
   background: #eef2ff;
   color: #3730a3;

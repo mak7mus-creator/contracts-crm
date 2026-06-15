@@ -1,10 +1,11 @@
 'use client';
-
+import { supabase } from '@/lib/supabaseClient';
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 
 type ContractStatus =
   | 'Підготовка Комерційної пропозиції'
+  | 'Тендерна процедура'
   | 'В процесі погодження'
   | 'Підготовка договору'
   | 'Договір на підписі'
@@ -25,9 +26,21 @@ type Contract = {
   deliveryDeadline: string;
   notes: string;
 };
-
+type ContractRow = {
+  id: string;
+  contract_number: string;
+  title: string;
+  customer: string;
+  amount: number;
+  status: ContractStatus;
+  contract_date: string | null;
+  delivery_deadline: string | null;
+  notes: string | null;
+  created_at?: string;
+};
 const STATUSES: ContractStatus[] = [
   'Підготовка Комерційної пропозиції',
+  'Тендерна процедура',
   'В процесі погодження',
   'Підготовка договору',
   'Договір на підписі',
@@ -48,7 +61,32 @@ const emptyForm: Omit<Contract, 'id'> = {
   deliveryDeadline: '',
   notes: '',
 };
+function mapRowToContract(row: ContractRow): Contract {
+  return {
+    id: row.id,
+    contractNumber: row.contract_number,
+    title: row.title,
+    customer: row.customer,
+    amount: Number(row.amount),
+    status: row.status,
+    contractDate: row.contract_date || '',
+    deliveryDeadline: row.delivery_deadline || '',
+    notes: row.notes || '',
+  };
+}
 
+function mapContractToRow(contract: Omit<Contract, 'id'>) {
+  return {
+    contract_number: contract.contractNumber,
+    title: contract.title,
+    customer: contract.customer,
+    amount: contract.amount,
+    status: contract.status,
+    contract_date: contract.contractDate,
+    delivery_deadline: contract.deliveryDeadline,
+    notes: contract.notes,
+  };
+}
 function formatMoney(value: number) {
   const formatted = new Intl.NumberFormat('uk-UA', {
     minimumFractionDigits: 2,
@@ -82,25 +120,24 @@ const [statusFilter, setStatusFilter] = useState<'Всі статуси' | Contr
 const [isLoaded, setIsLoaded] = useState(false);
 
 useEffect(() => {
-  const saved = localStorage.getItem('contracts-crm');
+  async function loadContracts() {
+    const { data, error } = await supabase
+      .from('contracts')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (saved) {
-    try {
-      setContracts(JSON.parse(saved));
-    } catch {
-      setContracts([]);
+    if (error) {
+      console.error('Помилка завантаження договорів:', error);
+      setIsLoaded(true);
+      return;
     }
+
+    setContracts((data || []).map((row) => mapRowToContract(row as ContractRow)));
+    setIsLoaded(true);
   }
 
-  setIsLoaded(true);
+  loadContracts();
 }, []);
-
-useEffect(() => {
-  if (!isLoaded) return;
-
-  localStorage.setItem('contracts-crm', JSON.stringify(contracts));
-}, [contracts, isLoaded]);
-
   const filteredContracts = useMemo(() => {
     return contracts.filter((contract) => {
       const text = `${contract.contractNumber} ${contract.title} ${contract.customer} ${contract.notes}`.toLowerCase();
@@ -139,45 +176,63 @@ useEffect(() => {
     }));
   }
 
-  function handleSubmit() {
-    if (!form.title.trim()) {
-      alert('Вкажіть назву договору або предмет закупівлі');
-      return;
-    }
-
-    if (!form.amount || Number(form.amount) <= 0) {
-      alert('Вкажіть суму договору');
-      return;
-    }
-
-    if (editingId) {
-      setContracts((prev) =>
-        prev.map((item) =>
-          item.id === editingId
-            ? {
-                ...item,
-                ...form,
-                amount: Number(form.amount),
-              }
-            : item
-        )
-      );
-
-      setEditingId(null);
-      setForm(emptyForm);
-      return;
-    }
-
-    const newContract: Contract = {
-      id: crypto.randomUUID(),
-      ...form,
-      contractNumber: form.contractNumber || makeNextContractNumber(contracts),
-      amount: Number(form.amount),
-    };
-
-    setContracts((prev) => [newContract, ...prev]);
-    setForm(emptyForm);
+  async function handleSubmit() {
+  if (!form.title.trim()) {
+    alert('Вкажіть назву договору або предмет закупівлі');
+    return;
   }
+
+  if (!form.amount || Number(form.amount) <= 0) {
+    alert('Вкажіть суму договору');
+    return;
+  }
+
+  const preparedForm: Omit<Contract, 'id'> = {
+    ...form,
+    contractNumber: form.contractNumber || makeNextContractNumber(contracts),
+    amount: Number(form.amount),
+  };
+
+  if (editingId) {
+    const { data, error } = await supabase
+      .from('contracts')
+      .update(mapContractToRow(preparedForm))
+      .eq('id', editingId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Помилка оновлення договору:', error);
+      alert('Не вдалося оновити договір');
+      return;
+    }
+
+    setContracts((prev) =>
+      prev.map((item) =>
+        item.id === editingId ? mapRowToContract(data as ContractRow) : item
+      )
+    );
+
+    setEditingId(null);
+    setForm(emptyForm);
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('contracts')
+    .insert(mapContractToRow(preparedForm))
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Помилка створення договору:', error);
+    alert('Не вдалося створити договір');
+    return;
+  }
+
+  setContracts((prev) => [mapRowToContract(data as ContractRow), ...prev]);
+  setForm(emptyForm);
+}
 
   function handleEdit(contract: Contract) {
     setEditingId(contract.id);
@@ -196,26 +251,44 @@ useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function handleDelete(id: string) {
-    const confirmed = confirm('Точно видалити цей договір?');
+  async function handleDelete(id: string) {
+  const confirmed = confirm('Точно видалити цей договір?');
 
-    if (!confirmed) return;
+  if (!confirmed) return;
 
-    setContracts((prev) => prev.filter((item) => item.id !== id));
+  const { error } = await supabase
+    .from('contracts')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Помилка видалення договору:', error);
+    alert('Не вдалося видалити договір');
+    return;
   }
-function handleStatusChange(id: string, status: ContractStatus) {
+
+  setContracts((prev) => prev.filter((item) => item.id !== id));
+}
+async function handleStatusChange(id: string, status: ContractStatus) {
+  const { data, error } = await supabase
+    .from('contracts')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Помилка зміни статусу:', error);
+    alert('Не вдалося змінити статус');
+    return;
+  }
+
   setContracts((prev) =>
     prev.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-            status,
-          }
-        : item
+      item.id === id ? mapRowToContract(data as ContractRow) : item
     )
   );
-}
-  function handleCancelEdit() {
+}  function handleCancelEdit() {
     setEditingId(null);
     setForm(emptyForm);
   }
