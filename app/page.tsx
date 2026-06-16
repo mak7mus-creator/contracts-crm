@@ -118,8 +118,9 @@ export default function Home() {
   const [form, setForm] = useState<Omit<Contract, 'id'>>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'Всі статуси' | ContractStatus>('Всі статуси');
-  const [isLoaded, setIsLoaded] = useState(false);
+const [statusFilter, setStatusFilter] = useState<'Всі статуси' | ContractStatus>('Всі статуси');
+const [customerFilter, setCustomerFilter] = useState('Всі замовники');
+const [isLoaded, setIsLoaded] = useState(false);
 
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -207,17 +208,30 @@ async function handleLogout() {
   setSession(null);
   setContracts([]);
 }
+const customers = useMemo(() => {
+  const uniqueCustomers = contracts
+    .map((contract) => contract.customer.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(uniqueCustomers)).sort((a, b) =>
+    a.localeCompare(b, 'uk')
+  );
+}, [contracts]);
   const filteredContracts = useMemo(() => {
-    return contracts.filter((contract) => {
-      const text = `${contract.contractNumber} ${contract.title} ${contract.customer} ${contract.notes}`.toLowerCase();
+  return contracts.filter((contract) => {
+    const text = `${contract.contractNumber} ${contract.title} ${contract.customer} ${contract.notes}`.toLowerCase();
 
-      const matchesSearch = text.includes(search.toLowerCase());
-      const matchesStatus =
-        statusFilter === 'Всі статуси' || contract.status === statusFilter;
+    const matchesSearch = text.includes(search.toLowerCase());
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [contracts, search, statusFilter]);
+    const matchesStatus =
+      statusFilter === 'Всі статуси' || contract.status === statusFilter;
+
+    const matchesCustomer =
+      customerFilter === 'Всі замовники' || contract.customer === customerFilter;
+
+    return matchesSearch && matchesStatus && matchesCustomer;
+  });
+}, [contracts, search, statusFilter, customerFilter]);
 
   const totalAmount = useMemo(() => {
     return filteredContracts.reduce((sum, item) => sum + Number(item.amount || 0), 0);
@@ -654,27 +668,40 @@ if (!session) {
           <h2>Список договорів</h2>
 
           <div className="filters">
-            <input
-              value={search}
-              placeholder="Пошук..."
-              onChange={(e) => setSearch(e.target.value)}
-            />
+  <input
+    value={search}
+    placeholder="Пошук..."
+    onChange={(e) => setSearch(e.target.value)}
+  />
 
-            <select
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as 'Всі статуси' | ContractStatus)
-              }
-            >
-              <option value="Всі статуси">Всі статуси</option>
+  <select
+    value={statusFilter}
+    onChange={(e) =>
+      setStatusFilter(e.target.value as 'Всі статуси' | ContractStatus)
+    }
+  >
+    <option value="Всі статуси">Всі статуси</option>
 
-              {STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </div>
+    {STATUSES.map((status) => (
+      <option key={status} value={status}>
+        {status}
+      </option>
+    ))}
+  </select>
+
+  <select
+    value={customerFilter}
+    onChange={(e) => setCustomerFilter(e.target.value)}
+  >
+    <option value="Всі замовники">Всі замовники</option>
+
+    {customers.map((customer) => (
+      <option key={customer} value={customer}>
+        {customer}
+      </option>
+    ))}
+  </select>
+</div>
         </div>
 
         <div className="desktopOnly tableWrapper">
@@ -724,7 +751,27 @@ if (!session) {
             </td>
             <td>{contract.contractDate || '—'}</td>
             <td>{contract.deliveryDeadline || '—'}</td>
-            <td>{contract.notes || '—'}</td>
+            <td>
+  {contract.notes ? (
+    contract.notes.length > 70 || contract.notes.includes('\n') ? (
+      <div className="notesTooltip hasTooltip">
+        <span className="notesPreview">
+          {contract.notes}
+        </span>
+
+        <div className="notesTooltipContent">
+          {contract.notes}
+        </div>
+      </div>
+    ) : (
+      <span className="notesPlain">
+        {contract.notes}
+      </span>
+    )
+  ) : (
+    '—'
+  )}
+</td>
             <td>
               <div className="rowActions">
                 <button onClick={() => handleEdit(contract)}>
