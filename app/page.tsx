@@ -532,70 +532,144 @@ function exportToExcel() {
           </div>
         </div>
 
-        <div className="tableWrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>№</th>
-                <th>Предмет закупівлі</th>
-                <th>Замовник</th>
-                <th>Сума</th>
-                <th>Статус</th>
-                <th>Дата</th>
-                <th>Дедлайн</th>
-                <th>Примітки</th>
-                <th>Дії</th>
-              </tr>
-            </thead>
+        <div className="desktopOnly tableWrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>№</th>
+        <th>Предмет закупівлі</th>
+        <th>Замовник</th>
+        <th>Сума</th>
+        <th>Статус</th>
+        <th>Дата</th>
+        <th>Дедлайн</th>
+        <th>Примітки</th>
+        <th>Дії</th>
+      </tr>
+    </thead>
 
-            <tbody>
-              {filteredContracts.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="empty">
-                    Поки немає договорів
-                  </td>
-                </tr>
-              ) : (
-                filteredContracts.map((contract) => (
-                  <tr key={contract.id}>
-                    <td>{contract.contractNumber}</td>
-                    <td className="titleCell">{contract.title}</td>
-                    <td>{contract.customer || '—'}</td>
-                    <td>{formatMoney(contract.amount)}</td>
-                    <td>
-  <select
-    className={`statusSelect ${getStatusClass(contract.status)}`}
-    value={contract.status}
-    onChange={(e) =>
-      handleStatusChange(contract.id, e.target.value as ContractStatus)
-    }
-  >
-    {STATUSES.map((status) => (
-      <option key={status} value={status}>
-        {status}
-      </option>
-    ))}
-  </select>
-</td>
-                    <td>{contract.contractDate || '—'}</td>
-                    <td>{contract.deliveryDeadline || '—'}</td>
-                    <td>{contract.notes || '—'}</td>
-                    <td>
-                      <div className="rowActions">
-                        <button onClick={() => handleEdit(contract)}>
-                          Редагувати
-                        </button>
-                        <button onClick={() => handleDelete(contract.id)}>
-                          Видалити
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+    <tbody>
+      {filteredContracts.length === 0 ? (
+        <tr>
+          <td colSpan={9} className="empty">
+            Поки немає договорів
+          </td>
+        </tr>
+      ) : (
+        filteredContracts.map((contract) => (
+          <tr key={contract.id}>
+            <td>{contract.contractNumber}</td>
+            <td className="titleCell">{contract.title}</td>
+            <td>{contract.customer || '—'}</td>
+            <td>{formatMoney(contract.amount)}</td>
+            <td>
+              <select
+                className={`statusSelect ${getStatusClass(contract.status)}`}
+                value={contract.status}
+                onChange={(e) =>
+                  handleStatusChange(contract.id, e.target.value as ContractStatus)
+                }
+              >
+                {STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </td>
+            <td>{contract.contractDate || '—'}</td>
+            <td>{contract.deliveryDeadline || '—'}</td>
+            <td>{contract.notes || '—'}</td>
+            <td>
+              <div className="rowActions">
+                <button onClick={() => handleEdit(contract)}>
+                  Редагувати
+                </button>
+                <button onClick={() => handleDelete(contract.id)}>
+                  Видалити
+                </button>
+              </div>
+            </td>
+          </tr>
+        ))
+      )}
+    </tbody>
+  </table>
+</div>
+
+<div className="mobileOnly mobileContractsList">
+  {filteredContracts.length === 0 ? (
+    <div className="mobileEmpty">Поки немає договорів</div>
+  ) : (
+    filteredContracts.map((contract) => (
+      <article className="contractMobileCard" key={contract.id}>
+        <div className="contractMobileTop">
+          <span className="contractMobileNumber">
+            {contract.contractNumber}
+          </span>
+
+          <strong className="contractMobileAmount">
+            {formatMoney(contract.amount)}
+          </strong>
         </div>
+
+        <h3 className="contractMobileTitle">{contract.title}</h3>
+
+        <div className="contractMobileInfo">
+          <div>
+            <span>Замовник</span>
+            <strong>{contract.customer || '—'}</strong>
+          </div>
+
+          <div>
+            <span>Дата договору</span>
+            <strong>{contract.contractDate || '—'}</strong>
+          </div>
+
+          <div>
+            <span>Дедлайн</span>
+            <strong>{contract.deliveryDeadline || '—'}</strong>
+          </div>
+        </div>
+
+        <div className="contractMobileStatus">
+          <span>Статус</span>
+
+          <select
+            className={`statusSelect ${getStatusClass(contract.status)}`}
+            value={contract.status}
+            onChange={(e) =>
+              handleStatusChange(contract.id, e.target.value as ContractStatus)
+            }
+          >
+            {STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {contract.notes && (
+          <div className="contractMobileNotes">
+            <span>Примітки</span>
+            <p>{contract.notes}</p>
+          </div>
+        )}
+
+        <div className="contractMobileActions">
+          <button onClick={() => handleEdit(contract)}>
+            Редагувати
+          </button>
+
+          <button onClick={() => handleDelete(contract.id)}>
+            Видалити
+          </button>
+        </div>
+      </article>
+    ))
+  )}
+</div>
       </section>
     </main>
   );

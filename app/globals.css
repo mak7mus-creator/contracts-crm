@@ -360,3 +360,143 @@ td:nth-child(5) {
     flex-direction: column;
   }
 }
+.desktopOnly {
+  display: block;
+}
+
+.mobileOnly {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktopOnly {
+    display: none;
+  }
+
+  .mobileOnly {
+    display: block;
+  }
+
+  .mobileContractsList {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .contractMobileCard {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+  }
+
+  .contractMobileTop {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .contractMobileNumber {
+    color: #2563eb;
+    font-size: 14px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .contractMobileAmount {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 800;
+    text-align: right;
+  }
+
+  .contractMobileTitle {
+    color: #111827;
+    font-size: 18px;
+    line-height: 1.25;
+    font-weight: 800;
+    margin: 0 0 14px;
+  }
+
+  .contractMobileInfo {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .contractMobileInfo div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .contractMobileInfo span,
+  .contractMobileStatus span,
+  .contractMobileNotes span {
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .contractMobileInfo strong {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 800;
+    text-align: right;
+  }
+
+  .contractMobileStatus {
+    margin-top: 12px;
+  }
+
+  .contractMobileStatus select {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 6px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .contractMobileNotes {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 12px;
+  }
+
+  .contractMobileNotes p {
+    margin: 6px 0 0;
+    color: #111827;
+    font-size: 14px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+
+  .contractMobileActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .contractMobileActions button {
+    min-height: 42px;
+    border-radius: 12px;
+    font-weight: 800;
+  }
+
+  .mobileEmpty {
+    padding: 18px;
+    text-align: center;
+    color: #64748b;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+  }
+}
