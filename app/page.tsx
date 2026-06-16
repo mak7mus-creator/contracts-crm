@@ -1,5 +1,7 @@
 'use client';
+
 import { supabase } from '@/lib/supabaseClient';
+import type { Session } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 
@@ -113,31 +115,97 @@ function makeNextContractNumber(contracts: Contract[]) {
 
 export default function Home() {
   const [contracts, setContracts] = useState<Contract[]>([]);
-const [form, setForm] = useState<Omit<Contract, 'id'>>(emptyForm);
-const [editingId, setEditingId] = useState<string | null>(null);
-const [search, setSearch] = useState('');
-const [statusFilter, setStatusFilter] = useState<'Всі статуси' | ContractStatus>('Всі статуси');
-const [isLoaded, setIsLoaded] = useState(false);
+  const [form, setForm] = useState<Omit<Contract, 'id'>>(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'Всі статуси' | ContractStatus>('Всі статуси');
+  const [isLoaded, setIsLoaded] = useState(false);
 
-useEffect(() => {
-  async function loadContracts() {
-    const { data, error } = await supabase
-      .from('contracts')
-      .select('*')
-      .order('created_at', { ascending: false });
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+async function loadContracts() {
+  const { data, error } = await supabase
+    .from('contracts')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Помилка завантаження договорів:', error);
-      setIsLoaded(true);
-      return;
-    }
-
-    setContracts((data || []).map((row) => mapRowToContract(row as ContractRow)));
+  if (error) {
+    console.error('Помилка завантаження договорів:', error);
     setIsLoaded(true);
+    return;
   }
 
-  loadContracts();
+  setContracts((data || []).map((row) => mapRowToContract(row as ContractRow)));
+  setIsLoaded(true);
+}
+
+useEffect(() => {
+  async function initAuth() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    setSession(session);
+
+    if (session) {
+      await loadContracts();
+    } else {
+      setContracts([]);
+      setIsLoaded(true);
+    }
+
+    setAuthLoading(false);
+  }
+
+  initAuth();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    setSession(newSession);
+
+    if (newSession) {
+      loadContracts();
+    } else {
+      setContracts([]);
+    }
+  });
+
+  return () => {
+    subscription.unsubscribe();
+  };
 }, []);
+async function handleLogin() {
+  setLoginError('');
+
+  if (!loginEmail.trim() || !loginPassword.trim()) {
+    setLoginError('Введіть email і пароль');
+    return;
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: loginEmail.trim(),
+    password: loginPassword,
+  });
+
+  if (error) {
+    console.error('Помилка входу:', error);
+    setLoginError('Невірний email або пароль');
+    return;
+  }
+
+  setSession(data.session);
+  await loadContracts();
+}
+
+async function handleLogout() {
+  await supabase.auth.signOut();
+  setSession(null);
+  setContracts([]);
+}
   const filteredContracts = useMemo(() => {
     return contracts.filter((contract) => {
       const text = `${contract.contractNumber} ${contract.title} ${contract.customer} ${contract.notes}`.toLowerCase();
@@ -368,6 +436,67 @@ function exportToExcel() {
 
   XLSX.writeFile(workbook, 'contracts-crm.xlsx');
 }
+if (authLoading) {
+  return (
+    <main className="page authPage">
+      <section className="authCard">
+        <h1>CRM облік договорів</h1>
+        <p>Завантаження...</p>
+      </section>
+    </main>
+  );
+}
+
+if (!session) {
+  return (
+    <main className="page authPage">
+      <section className="authCard">
+        <h1>CRM облік договорів</h1>
+        <p>Увійдіть, щоб працювати з договорами.</p>
+
+        <div className="authForm">
+          <label>
+            Email
+            <input
+              type="email"
+              value={loginEmail}
+              autoComplete="username"
+              placeholder="email@example.com"
+              onChange={(e) => setLoginEmail(e.target.value)}
+            />
+          </label>
+
+          <label>
+            Пароль
+            <input
+              type="password"
+              value={loginPassword}
+              autoComplete="current-password"
+              placeholder="Ваш пароль"
+              onChange={(e) => setLoginPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleLogin();
+                }
+              }}
+            />
+          </label>
+
+          {loginError && <div className="authError">{loginError}</div>}
+
+          <button className="primaryButton" onClick={handleLogin}>
+            Увійти
+          </button>
+
+          <p className="authHint">
+            На iPhone збережіть пароль в iCloud Keychain — наступного разу Safari
+            або Chrome запропонує вхід через Face ID.
+          </p>
+        </div>
+      </section>
+    </main>
+  );
+}
   return (
     <main className="page">
       <section className="header">
@@ -376,14 +505,18 @@ function exportToExcel() {
           <p>Система для контролю договорів, поставок, оплат і статусів.</p>
         </div>
 
-        <div className="exportButtons">
+   <div className="exportButtons">
   <button className="secondaryButton" onClick={exportToCsv}>
     Експорт CSV
   </button>
 
   <button className="secondaryButton" onClick={exportToExcel}>
-  Експорт Excel
-</button>
+    Експорт Excel
+  </button>
+
+  <button className="secondaryButton" onClick={handleLogout}>
+    Вийти
+  </button>
 </div>
       </section>
 
