@@ -200,7 +200,10 @@ th {
 
 .titleCell {
   font-weight: 700;
-  max-width: 280px;
+  max-width: 260px;
+  line-height: 1.35;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .status {
@@ -648,9 +651,14 @@ td:nth-child(5) {
 }
 .statusSelect {
   width: 100%;
-  min-width: 280px;
-  max-width: 340px;
+  max-width: 220px;
+  min-width: 0;
   min-height: 38px;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 28px 6px 12px;
+  font-size: 12px;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -662,7 +670,7 @@ td:nth-child(5) {
 
 .tableWrapper th:nth-child(5),
 .tableWrapper td:nth-child(5) {
-  width: 340px;
+  width: 230px;
 }
 
 .tableWrapper th:nth-child(8),
@@ -674,17 +682,6 @@ td:nth-child(5) {
 .tableWrapper td:nth-child(9) {
   width: 230px;
 }
-
-.statusSelect {
-  width: 100%;
-  min-width: 280px;
-  max-width: 340px;
-  min-height: 38px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .notesPlain {
   display: inline-block;
   max-width: 280px;
@@ -753,4 +750,30 @@ td:nth-child(5) {
 
 .hasTooltip:hover .notesTooltipContent {
   display: block;
+}
+.tableWrapper th:nth-child(1),
+.tableWrapper td:nth-child(1) {
+  width: 110px;
+}
+
+.tableWrapper th:nth-child(2),
+.tableWrapper td:nth-child(2) {
+  width: 260px;
+}
+
+.tableWrapper th:nth-child(3),
+.tableWrapper td:nth-child(3) {
+  width: 150px;
+}
+
+.tableWrapper th:nth-child(4),
+.tableWrapper td:nth-child(4) {
+  width: 130px;
+}
+
+.tableWrapper th:nth-child(6),
+.tableWrapper td:nth-child(6),
+.tableWrapper th:nth-child(7),
+.tableWrapper td:nth-child(7) {
+  width: 100px;
 }
