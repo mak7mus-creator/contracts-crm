@@ -582,3 +582,42 @@ td:nth-child(5) {
     font-size: 24px;
   }
 }
+.passwordField {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.passwordField input {
+  padding-right: 104px;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.passwordToggle:hover {
+  background: #cbd5e1;
+}
+
+@media (max-width: 768px) {
+  .passwordField input {
+    padding-right: 96px;
+  }
+
+  .passwordToggle {
+    right: 7px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+}

@@ -126,6 +126,7 @@ export default function Home() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+const [showPassword, setShowPassword] = useState(false);
 async function loadContracts() {
   const { data, error } = await supabase
     .from('contracts')
@@ -466,21 +467,32 @@ if (!session) {
             />
           </label>
 
-          <label>
-            Пароль
-            <input
-              type="password"
-              value={loginPassword}
-              autoComplete="current-password"
-              placeholder="Ваш пароль"
-              onChange={(e) => setLoginPassword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleLogin();
-                }
-              }}
-            />
-          </label>
+        <label>
+  Пароль
+
+  <div className="passwordField">
+    <input
+      type={showPassword ? 'text' : 'password'}
+      value={loginPassword}
+      autoComplete="current-password"
+      placeholder="Ваш пароль"
+      onChange={(e) => setLoginPassword(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          handleLogin();
+        }
+      }}
+    />
+
+    <button
+      type="button"
+      className="passwordToggle"
+      onClick={() => setShowPassword((prev) => !prev)}
+    >
+      {showPassword ? 'Сховати' : 'Показати'}
+    </button>
+  </div>
+</label>
 
           {loginError && <div className="authError">{loginError}</div>}
 
